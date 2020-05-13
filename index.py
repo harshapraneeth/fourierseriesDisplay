@@ -2,50 +2,70 @@ import math
 import time
 import pygame as pg
 from pygame import gfxdraw as gf
+import numpy as np
 
-size = (1000, 800)
-hsize = (size[0]//2, size[1]//2)
-tlen = 1000 #trace length
-tll = 1 #trace line length
-n = 5
+drawing = [(x,300) for x in np.arange(-150,-100,2)]
+drawing+= [(-100,y) for y in np.arange(300,25,-2)]
+drawing+= [(x,25) for x in np.arange(-100,100,2)]
+drawing+= [(100,y) for y in np.arange(25,300,2)]
+drawing+= [(x,300) for x in np.arange(100,150,2)]
+drawing+= [(150,y) for y in np.arange(300,-300,-2)]
+drawing+= [(x,-300) for x in np.arange(150,100,-2)]
+drawing+= [(100,y) for y in np.arange(-300,-25,2)]
+drawing+= [(x,-25) for x in np.arange(100,-100,-2)]
+drawing+= [(-100,y) for y in np.arange(-100,-300,-2)]
+drawing+= [(x,-300) for x in np.arange(-100,-150,-2)]
+drawing+= [(-150,y) for y in np.arange(-300,300,2)]
 
 
-t, pp = 0, []
-def ma(p): return (hsize[0]-200+p[0], hsize[1]-p[1])
-def ma2(p): return (hsize[0]+100+p[0], hsize[1]-p[1])
+def addc(p1, p2): return (p1[0]+p2[0], p1[1]+p2[1])
+def mulc(p1, p2): return (p1[0]*p2[0]-p1[1]*p2[1], p1[0]*p2[1]+p1[1]*p2[0])
+def move(p): return (p[0], p[1])
 
-def draw(screen):
-    global t, pp
-    screen.fill((0, 0, 0))
-    x, y = 0, 0
-    for i in range(n):
+def dft(x):
+    C, N = [], len(x)
+    step = 1
+    for k in range(0,N,step):
+        s = (0,0)
+        for n in range(0,N,step):
+            phi = (2*math.pi*k*n)/N
+            c = (math.cos(phi), math.sin(phi))
+            s = addc(s, mulc(x[n],c))
+        s = (s[0]*step/N, s[1]*step/N)
+        C.append((s[0], s[1], k, math.sqrt(s[0]*s[0]+s[1]*s[1]), math.atan2(s[1],s[0])))
+    return C
+
+x, path = [], []
+for i in drawing: x.append((i[0], i[1]))
+t, fx = 0, dft(x)
+
+def cycle(x, y, r, f):
+    for i in range(len(f)):
         px, py = x, y
-        pn = 2*i+1
-        r = round(100*(4/(pn*math.pi)))
-        x = round(x+r*math.cos(pn*t))
-        y = round(y+r*math.sin(pn*t))
-        gf.circle(screen, ma((px,0))[0], ma((0,py))[1], r, (255,255,255,96))
-        pg.draw.line(screen, (255,255,255), ma((px, py)), ma((x,y)), 1)
-    pp = [y]+pp
-    pg.draw.line(screen,(0,255,0), ma((x,y)), ma((200,pp[0])))
-    trace()
-    t += 0.05
+        fq, rd, ph = f[i][2], f[i][3], f[i][4]
+        x += rd*math.cos(fq*t+ph+r)
+        y += rd*math.sin(fq*t+ph+r)
+        gf.circle(screen, round(move((px,0))[0]), round(move((0,py))[1]), round(rd), (255,255,255,98))
+        pg.draw.line(screen, (255,255,255), move((px, py)), move((x,y)), 1)
+    return (x,y)
 
-def trace():
-    global pp
-    n = len(pp)
-    if n>tlen: pp, n = pp[:tlen], tlen
-    if n>tll:
-        for i in range(n-tll):
-            pg.draw.line(screen,(0,255,0),(hsize[0]+i,hsize[1]-pp[i]),(hsize[0]+i+tll,hsize[1]-pp[i+tll]),1)
+def trace(pp):
+    try:
+        for i in range(1,len(pp)): pg.draw.line(screen, (0,255,0), move((round(pp[i-1][0]), round(pp[i-1][1]))), move((round(pp[i][0]), round(pp[i][1]))), 1)
+    except: pass
 
 pg.init()
-screen = pg.display.set_mode(size, pg.SRCALPHA)
+screen = pg.display.set_mode((800,800))
 pg.display.set_caption('Fourier Draws')
 
 while True:
     for event in pg.event.get():
         if event.type == pg.QUIT: pg.quit()
-    draw(screen)
+    screen.fill((0, 0, 0))
+    path = [cycle(400, 400, 0, fx)]+path
+    trace(path)
+    dt = 2*math.pi/len(fx)
+    t += dt
+    if t> 4*math.pi: t, path = 0, []
     pg.display.update()
-    time.sleep(0.01)
+    #time.sleep(0.01)
